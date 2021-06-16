@@ -9,6 +9,7 @@ im = Image.open('Map_0009.tif')  # Open tif file
 im_array = np.array(im)
 im_array = im_array[:, :, 0:3]
 
+# Initialize variables
 line_array = []
 j = 0
 start_point = None
@@ -16,12 +17,14 @@ end_point = None
 count = 0
 
 
+# Class containing point objects' x and y integer values for array indexing
 class Point:
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
+        self.x = int(x)
+        self.y = int(y)
 
 
+# Lines consist of start and end points, and all points within calculated by point-slope formula
 class Line:
     def __init__(self, start, end):
         self.start = start
@@ -48,6 +51,7 @@ class Line:
         self.points = point_array
 
 
+# Through Matplotlib GUI, extract start and end points
 def onclick(event):
     global j
     global line_array
@@ -70,48 +74,82 @@ def onclick(event):
             plt.pause(0.001)
 
 
+# Open colorized image in GUI
 figure, axis = plt.subplots(1, num="Initial Road-Marking Procedure")
 axis.imshow(im_array, cmap="Greys_r", vmin=0, vmax=255)
 cid = figure.canvas.mpl_connect('button_press_event', onclick)
 plt.show()
 
+# Append points in line, and surrounding points. Surrounding points to include was decided arbitrarily.
 totalPoints = []
 for line in line_array:
     for point in line.points:
         totalPoints.append(point)
+        totalPoints.append(Point(point.x - 1, point.y - 1))
+        totalPoints.append(Point(point.x, point.y - 1))
+        totalPoints.append(Point(point.x + 1, point.y - 1))
+        totalPoints.append(Point(point.x - 1, point.y))
+        totalPoints.append(Point(point.x + 1, point.y))
+        totalPoints.append(Point(point.x - 1, point.y + 1))
+        totalPoints.append(Point(point.x, point.y + 1))
+        totalPoints.append(Point(point.x + 1, point.y + 1))
 
-mask = np.matrix([[1, 1, 1], [1, 0, 1], [1, 1, 1]])
+# Created mask arbitrarily as well
+mask = np.matrix([[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                  [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1],
+                  [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1],
+                  [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1],
+                  [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1],
+                  [1, 1, 1, 0, 0, 0, 0, 0, 1, 1, 1],
+                  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
 
-blurredImage = copy.deepcopy(im_array)
+
+# To perform convolution, image should be gray scaled
+def to_gray_scale(image):
+    r, g, b = image[:, :, 0], image[:, :, 1], image[:, :, 2]
+    image = 0.299 * r + 0.587 * g + 0.114 * b
+    return image
 
 
+gray_im = to_gray_scale(im_array)
+
+
+# Function is a modified version of that used in Lab 3. Iterates through points within the totalPoints array.
 def convolution(image, kernel):
-    # Create a result buffer so that you don't affect the original image
-    result = np.zeros(image.shape)
-    for i in range(image.shape[1] - 2):
-        for j in range(image.shape[0] - 2):
-            result[j + 1, i + 1] = np.sum(np.multiply(
-                image[j + 1 - math.floor(kernel.shape[0] / 2):j + 1 + math.ceil(kernel.shape[0] / 2),
-                i + 1 - math.floor(kernel.shape[1] / 2):i + 1 + math.ceil(kernel.shape[1] / 2)], kernel))
+    result = copy.deepcopy(gray_im)
+    for p in totalPoints:
+        result[p.y, p.x] = (np.sum(np.multiply(
+            image[p.y + 1 - math.floor(kernel.shape[0] / 2):p.y + 1 + math.ceil(kernel.shape[0] / 2),
+                  p.x + 1 - math.floor(kernel.shape[1] / 2):p.x + 1 + math.ceil(kernel.shape[1] / 2)], kernel))) / 96.0
     return result
 
 
-for point in totalPoints:
-    blurredImage[int(point.y), int(point.x)] = \
-        (im_array[int(point.y) - 1, int(point.x) - 1] + im_array[int(point.y) - 1, int(point.x)] +
-         im_array[int(point.y) - 1, int(point.x) + 1] + im_array[int(point.y), int(point.x) - 1] +
-         im_array[int(point.y), int(point.x) + 1] + im_array[int(point.y) + 1, int(point.x) - 1] +
-         im_array[int(point.y) + 1, int(point.x)] + im_array[int(point.y) + 1, int(point.x)] + 1) / 8
+blurredImage = convolution(gray_im, mask)
 
+# Plot the three images used
 fig = plt.figure(figsize=(10, 10), num="Road-b-Gone")
 
-rows = 1
+rows = 2
 columns = 2
 
 fig.add_subplot(rows, columns, 1, title="Raw Image")
 plt.imshow(im_array, cmap="Greys_r", vmin=0, vmax=255)
 
-fig.add_subplot(rows, columns, 2, title="Road Removed")
+fig.add_subplot(rows, columns, 2, title="Gray Image")
+plt.imshow(gray_im, cmap="Greys_r", vmin=0, vmax=255)
+
+fig.add_subplot(rows, columns, 3, title="Road Removed")
 plt.imshow(blurredImage, cmap="Greys_r", vmin=0, vmax=255)
 
 plt.show()
+
+# At this point, several things are happening. First, the lines are generally off a few pixels. Not sure if
+# this is because of the GUI or what, but it makes the blurring happen in the wrong areas often. Second, there is too
+# much hard-coding going on. I should give the user the ability to specify the thickness of the road in pixels at the
+# beginning and then adjust automatically. Finally, it doesn't look that great. I think I should make it so that the
+# blurring happens more gradually, like a sort of fade, rather than a hard cut like we still see (even after blurring
+# the road). Median filtering also may have worked a little better.
