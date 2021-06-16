@@ -39,7 +39,7 @@ def edge_detect(image):
 # Perform edge detection on image
 edge_im = edge_detect(gray_im)
 
-fig = plt.figure(figsize=(10, 10))
+fig = plt.figure(figsize=(10, 10), num="Road Detection Attempt")
 
 rows = 3
 columns = 2
